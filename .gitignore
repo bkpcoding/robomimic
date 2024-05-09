@@ -1,6 +1,8 @@
 # pip distribution folder
 dist/
 
+# trained models
+/bc_trained_models
 # datasets folder at top-level (leading slash)
 /datasets/
 

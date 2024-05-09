@@ -108,6 +108,8 @@ class BC(PolicyAlgo):
         """
         input_batch = dict()
         input_batch["obs"] = {k: batch["obs"][k][:, 0, :] for k in batch["obs"]}
+        # for keys in input_batch["obs"]:
+        #     print(f"The shape of {keys} is {input_batch['obs'][keys].shape}")
         input_batch["goal_obs"] = batch.get("goal_obs", None) # goals may not be present
         input_batch["actions"] = batch["actions"][:, 0, :]
         # we move to device first before float conversion because image observation modalities will be uint8 -
