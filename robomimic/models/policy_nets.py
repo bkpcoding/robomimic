@@ -685,7 +685,6 @@ class RNNActorNetwork(RNN_MIMO_MLP):
 
         outputs = super(RNNActorNetwork, self).forward(
             obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state)
-
         if return_state:
             actions, state = outputs
         else:
@@ -851,7 +850,6 @@ class RNNGMMActorNetwork(RNNActorNetwork):
 
         outputs = RNN_MIMO_MLP.forward(
             self, obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state)
-
         if return_state:
             outputs, state = outputs
         else:

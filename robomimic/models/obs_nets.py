@@ -799,7 +799,6 @@ class RNN_MIMO_MLP(Module):
             outputs = self.nets["decoder"](self.mlp(outputs[:, -1]))
         else:
             outputs = self.nets["decoder"](outputs[:, -1])
-
         if return_state:
             return outputs, rnn_state
         return outputs

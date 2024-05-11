@@ -538,6 +538,40 @@ class BC_RNN(BC):
             obs_to_use, goal_dict=goal_dict, rnn_state=self._rnn_hidden_state)
         return action
 
+
+    def get_action_dist(self, obs_dict, goal_dict=None):
+        """
+        Get policy action distributions.
+
+        Args:
+            obs_dict (dict): current observation
+            goal_dict (dict): (optional) goal
+
+        Returns:
+            action (torch.Distributions): action distribution
+        """
+        assert not self.nets.training
+
+        if self._rnn_hidden_state is None or self._rnn_counter % self._rnn_horizon == 0:
+            batch_size = list(obs_dict.values())[0].shape[0]
+            self._rnn_hidden_state = self.nets["policy"].get_rnn_init_state(batch_size=batch_size, device=self.device)
+
+            if self._rnn_is_open_loop:
+                # remember the initial observation, and use it instead of the current observation
+                # for open-loop action sequence prediction
+                self._open_loop_obs = TensorUtils.clone(TensorUtils.detach(obs_dict))
+
+        obs_to_use = obs_dict
+        if self._rnn_is_open_loop:
+            # replace current obs with last recorded obs
+            obs_to_use = self._open_loop_obs
+
+        self._rnn_counter += 1
+        obs_to_use = TensorUtils.to_sequence(obs_to_use)
+        action_dist, self._rnn_hidden_state = self.nets["policy"].forward_train(
+            obs_to_use, goal_dict=goal_dict, rnn_init_state=self._rnn_hidden_state, return_state=True)
+        return action_dist
+
     def reset(self):
         """
         Reset algo state to prepare for environment rollouts.
