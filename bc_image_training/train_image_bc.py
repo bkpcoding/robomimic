@@ -9,8 +9,9 @@ config = config_factory(algo_name="bc")
 config = convert_config_for_images(config)
 
 # set config attributes here that you would like to update
-config.experiment.name = "bc_image_square_2"
-config.train.data = "../datasets/square/ph/image_v141.hdf5"
+config.algo.rnn.enabled = True
+config.experiment.name = "bc_rnn_pick"
+config.train.data = "../datasets/lift/ph/image_v141.hdf5"
 config.train.output_dir = "../bc_trained_models/image"
 config.train.num_epochs = 600
 config.algo.gmm.enabled = False

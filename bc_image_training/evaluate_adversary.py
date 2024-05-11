@@ -58,6 +58,6 @@ def evaluate_epsilon_range(vanilla_bc_model_path, number_of_rollouts, adversary=
 
     wandb.finish()
 
-# vanilla_bc_model_path = '../bc_trained_models/image/bc_image/20240509144611/models/model_epoch_500_Lift_success_0.9.pth'
+vanilla_bc_model_path = '../bc_trained_models/image/bc_image/20240509144611/models/model_epoch_500_Lift_success_0.9.pth'
 number_of_rollouts = 10
 evaluate_epsilon_range(vanilla_bc_model_path, number_of_rollouts, adversary="fgsm")

@@ -104,3 +104,27 @@ def FGSM(model, obs, target_action, epsilon, device = 'cpu'):
 
     return perturbed_obs
 
+def FGSM_RNN(model, obs, target_action, epsilon, device = 'cpu'):
+    """
+    Fast Gradient Sign Method (FGSM) for generating adversarial examples
+    in a regression task.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The model to attack.
+    x : torch.Tensor
+        The input tensor.
+    y : torch.Tensor
+        The target tensor.
+    epsilon : float
+        The perturbation size.
+
+    Returns
+    -------
+    torch.Tensor
+        The adversarial example.
+    """
+    # Extract the image input from the observation
+    print(model)
+    encoder = model.nets["encoder"].nets["obs"].obs_nets['agentview_image']
