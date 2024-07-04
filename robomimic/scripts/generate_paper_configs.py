@@ -348,8 +348,7 @@ def modify_bc_config_for_dataset(config, task_name, dataset_type, hdf5_type):
         # base parameters that may get modified
         config.algo.optim_params.policy.learning_rate.initial = 1e-4            # learning rate 1e-4
         config.algo.actor_layer_dims = (1024, 1024)                             # MLP size (1024, 1024)
-        config.algo.gmm.enabled = True                                          # enable GMM
-
+        # config.algo.gmm.enabled = True                                          # enable GMM
         if dataset_type == "mg":
             # machine-generated datasets don't use GMM
             config.algo.gmm.enabled = False                                     # disable GMM
