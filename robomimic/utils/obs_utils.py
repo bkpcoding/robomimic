@@ -92,6 +92,7 @@ def obs_encoder_kwargs_from_config(obs_encoder_config):
     # Loop over each obs modality
     # Unlock encoder config
     obs_encoder_config.unlock()
+    print(f"Observation encoder config: ", obs_encoder_config)
     for obs_modality, encoder_kwargs in obs_encoder_config.items():
         # First run some sanity checks and store the classes
         for cls_name, cores in zip(("core", "obs_randomizer"), (OBS_ENCODER_CORES, OBS_RANDOMIZERS)):

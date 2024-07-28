@@ -25,7 +25,7 @@ from robomimic import DATASET_REGISTRY
 from robomimic.config import Config, BCConfig, BCQConfig, CQLConfig, HBCConfig, IRISConfig, config_factory
 
 
-def modify_config_for_default_low_dim_exp(config):
+def modify_config_for_default_low_dim_exp(config, pretrained_backbone=False):
     """
     Modifies a Config object with experiment, training, and observation settings that
     were used across all low-dimensional experiments by default.
@@ -94,7 +94,7 @@ def modify_config_for_default_low_dim_exp(config):
     return config
 
 
-def modify_config_for_default_image_exp(config):
+def modify_config_for_default_image_exp(config, pretrained_backbone=False, resnet_50=False):
     """
     Modifies a Config object with experiment, training, and observation settings that
     were used across all image experiments by default.
@@ -150,9 +150,20 @@ def modify_config_for_default_image_exp(config):
         # default image encoder architecture is ResNet with spatial softmax
         config.observation.encoder.rgb.core_class = "VisualCore"
         config.observation.encoder.rgb.core_kwargs.feature_dimension = 64
-        config.observation.encoder.rgb.core_kwargs.backbone_class = 'ResNet18Conv'                         # ResNet backbone for image observations (unused if no image observations)
-        config.observation.encoder.rgb.core_kwargs.backbone_kwargs.pretrained = False                # kwargs for visual core
-        config.observation.encoder.rgb.core_kwargs.backbone_kwargs.input_coord_conv = False
+        if resnet_50:
+            config.observation.encoder.rgb.core_kwargs.backbone_class = 'R3MConv'                         # R3M backbone for image observations (unused if no image observations)
+            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.r3m_model_class = 'resnet50'       # R3M model class (resnet18, resnet34, resnet50)
+            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.freeze = True                      # whether to freeze network during training or allow finetuning
+            config.observation.encoder.rgb.core_kwargs.pool_class = None                                  # no pooling class for pretraining model
+        else:
+            config.observation.encoder.rgb.core_kwargs.backbone_class = 'ResNet18Conv'                    # ResNet backbone for image observations (unused if no image observations)
+        if pretrained_backbone == True:
+            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.pretrained = True                 # kwargs for visual core
+            print("******** Using pretrained backbone ********")
+            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.input_coord_conv = False
+        else:
+            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.pretrained = False                # kwargs for visual core
+            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.input_coord_conv = False
         config.observation.encoder.rgb.core_kwargs.pool_class = "SpatialSoftmax"                # Alternate options are "SpatialMeanPool" or None (no pooling)
         config.observation.encoder.rgb.core_kwargs.pool_kwargs.num_kp = 32                      # Default arguments for "SpatialSoftmax"
         config.observation.encoder.rgb.core_kwargs.pool_kwargs.learnable_temperature = False    # Default arguments for "SpatialSoftmax"

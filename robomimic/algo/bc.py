@@ -209,7 +209,7 @@ class BC(PolicyAlgo):
             log["Policy_Grad_Norms"] = info["policy_grad_norms"]
         return log
 
-    def get_action(self, obs_dict, goal_dict=None):
+    def get_action(self, obs_dict, goal_dict=None, cfg_activation=None):
         """
         Get policy action outputs.
 
@@ -221,7 +221,7 @@ class BC(PolicyAlgo):
             action (torch.Tensor): action tensor
         """
         assert not self.nets.training
-        return self.nets["policy"](obs_dict, goal_dict=goal_dict)
+        return self.nets["policy"](obs_dict, goal_dict=goal_dict, cfg_activation=cfg_activation)
 
 
 class BC_Gaussian(BC):

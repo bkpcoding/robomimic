@@ -22,7 +22,7 @@ from robomimic.utils.python_utils import extract_class_init_kwargs_from_dict
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
 from robomimic.models.base_nets import Module, Sequential, MLP, RNN_Base, ResNet18Conv, SpatialSoftmax, \
-    FeatureAggregator, VisualCore, Randomizer
+    FeatureAggregator, VisualCore, Randomizer, R3MConv
 
 
 def obs_encoder_factory(
@@ -92,6 +92,13 @@ def obs_encoder_factory(
 
     enc.make()
     return enc
+
+from baukit import Trace, TraceDict
+from functools import partial
+
+def obs_activation_modifier(output, layer, gamma, orig_act):
+    print('modifying activation')
+    return gamma*output + (1-gamma)*orig_act 
 
 
 class ObservationEncoder(Module):
@@ -171,6 +178,10 @@ class ObservationEncoder(Module):
         self.obs_nets[name] = net
         self.obs_randomizers[name] = randomizer
         self.obs_share_mods[name] = share_net_from
+        # self.layers = ['0.nets.4.0.conv1']
+        # self.layers = ['0.nets.1']
+        # self.layers = ['0.nets.2.1.conv1']
+        self.layers = ['0.nets.4.1']
 
     def make(self):
         """
@@ -198,7 +209,7 @@ class ObservationEncoder(Module):
         if self.feature_activation is not None:
             self.activation = self.feature_activation()
 
-    def forward(self, obs_dict):
+    def forward(self, obs_dict, cfg_activation=None):
         """
         Processes modalities according to the ordering in @self.obs_shapes. For each
         modality, it is processed with a randomizer (if present), an encoder
@@ -220,9 +231,13 @@ class ObservationEncoder(Module):
         assert set(self.obs_shapes.keys()).issubset(obs_dict), "ObservationEncoder: {} does not contain all modalities {}".format(
             list(obs_dict.keys()), list(self.obs_shapes.keys())
         )
+        modify_act = False if cfg_activation == None else cfg_activation['modify_act']
+        if modify_act == True:
+            act_modifier = partial(obs_activation_modifier, gamma=cfg_activation['gamma'], orig_act=cfg_activation['orig_act'])
 
         # process modalities by order given by @self.obs_shapes
         feats = []
+        self.representation_dict = {}
         for k in self.obs_shapes:
             x = obs_dict[k]
             # maybe process encoder input with randomizer
@@ -230,7 +245,20 @@ class ObservationEncoder(Module):
                 x = self.obs_randomizers[k].forward_in(x)
             # maybe process with obs net
             if self.obs_nets[k] is not None:
-                x = self.obs_nets[k](x)
+                if k == "robot0_eye_in_hand_image":
+                    net = self.obs_nets[k].nets
+                    if modify_act == True:
+                        with TraceDict(net, self.layers, edit_output=act_modifier) as ret:
+                            x = net(x)
+                            for layer in self.layers:
+                                self.representation_dict[layer] = ret[layer].output
+                    else:
+                        with TraceDict(net, self.layers) as ret:
+                            x = net(x)
+                            for layer in self.layers:
+                                self.representation_dict[layer] = ret[layer].output
+                else:
+                    x = self.obs_nets[k](x)
                 if self.activation is not None:
                     x = self.activation(x)
             # maybe process encoder output with randomizer
@@ -438,11 +466,16 @@ class ObservationGroupEncoder(Module):
         outputs = []
         # Deterministic order since self.observation_group_shapes is OrderedDict
         for obs_group in self.observation_group_shapes:
-            # pass through encoder
-            outputs.append(
-                self.nets[obs_group].forward(inputs[obs_group])
-            )
-
+            # check if inputs has a key for cfg_activation
+            if 'cfg_activation' in inputs.keys():
+                outputs.append(
+                    self.nets[obs_group].forward(inputs[obs_group], cfg_activation=inputs['cfg_activation'])
+                )
+            else:
+                # pass through encoder
+                outputs.append(
+                    self.nets[obs_group].forward(inputs[obs_group])
+                )
         return torch.cat(outputs, dim=-1)
 
     def output_shape(self):
@@ -557,6 +590,7 @@ class MIMO_MLP(Module):
             decode_shapes=self.output_shapes,
             input_feat_dim=layer_dims[-1],
         )
+        self.enc_outputs = None
 
     def output_shape(self, input_shape=None):
         """
@@ -579,8 +613,8 @@ class MIMO_MLP(Module):
             outputs (dict): dictionary of output torch.Tensors, that corresponds
                 to @self.output_shapes
         """
-        enc_outputs = self.nets["encoder"](**inputs)
-        mlp_out = self.nets["mlp"](enc_outputs)
+        self.enc_outputs = self.nets["encoder"](**inputs)
+        mlp_out = self.nets["mlp"](self.enc_outputs)
         return self.nets["decoder"](mlp_out)
 
     def _to_string(self):
@@ -758,7 +792,7 @@ class RNN_MIMO_MLP(Module):
         # returns a dictionary instead of list since outputs are dictionaries
         return { k : [T] + list(self.output_shapes[k]) for k in self.output_shapes }
 
-    def forward(self, rnn_init_state=None, return_state=False, **inputs):
+    def forward(self, rnn_init_state=None, return_state=False, return_features=False, **inputs):
         """
         Args:
             inputs (dict): a dictionary of dictionaries with one dictionary per
@@ -786,14 +820,15 @@ class RNN_MIMO_MLP(Module):
         # use encoder to extract flat rnn inputs
         rnn_inputs = TensorUtils.time_distributed(inputs, self.nets["encoder"], inputs_as_kwargs=True)
         assert rnn_inputs.ndim == 3  # [B, T, D]
-        if self.per_step:
+        if self.per_step and return_features:
+            return self.nets["rnn"].forward(inputs=rnn_inputs, rnn_init_state=rnn_init_state, return_state=return_state), rnn_inputs
+        elif self.per_step:
             return self.nets["rnn"].forward(inputs=rnn_inputs, rnn_init_state=rnn_init_state, return_state=return_state)
         
         # apply MLP + decoder to last RNN output
         outputs = self.nets["rnn"].forward(inputs=rnn_inputs, rnn_init_state=rnn_init_state, return_state=return_state)
         if return_state:
             outputs, rnn_state = outputs
-
         assert outputs.ndim == 3 # [B, T, D]
         if self._has_mlp:
             outputs = self.nets["decoder"](self.mlp(outputs[:, -1]))

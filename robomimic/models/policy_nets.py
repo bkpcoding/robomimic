@@ -100,8 +100,8 @@ class ActorNetwork(MIMO_MLP):
     def output_shape(self, input_shape=None):
         return [self.ac_dim]
 
-    def forward(self, obs_dict, goal_dict=None):
-        actions = super(ActorNetwork, self).forward(obs=obs_dict, goal=goal_dict)["action"]
+    def forward(self, obs_dict, goal_dict=None, cfg_activation=None):
+        actions = super(ActorNetwork, self).forward(obs=obs_dict, goal=goal_dict, cfg_activation=cfg_activation)["action"]
         # apply tanh squashing to ensure actions are in [-1, 1]
         return torch.tanh(actions)
 
@@ -644,6 +644,8 @@ class RNNActorNetwork(RNN_MIMO_MLP):
             per_step=True,
             encoder_kwargs=encoder_kwargs,
         )
+        self.enc_outputs = None
+        self.return_features = True
 
     def _get_output_shapes(self):
         """
@@ -684,7 +686,9 @@ class RNNActorNetwork(RNN_MIMO_MLP):
             goal_dict = TensorUtils.unsqueeze_expand_at(goal_dict, size=obs_dict[mod].shape[1], dim=1)
 
         outputs = super(RNNActorNetwork, self).forward(
-            obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state)
+            obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state, return_features=self.return_features)
+        if self.return_features:
+            actions, state, self.enc_outputs = outputs
         if return_state:
             actions, state = outputs
         else:
@@ -693,7 +697,6 @@ class RNNActorNetwork(RNN_MIMO_MLP):
         
         # apply tanh squashing to ensure actions are in [-1, 1]
         actions = torch.tanh(actions["action"])
-
         if return_state:
             return actions, state
         else:
@@ -814,6 +817,8 @@ class RNNGMMActorNetwork(RNNActorNetwork):
             goal_shapes=goal_shapes,
             encoder_kwargs=encoder_kwargs,
         )
+        self.return_features = True
+        self.enc_outputs = None
 
     def _get_output_shapes(self):
         """
@@ -847,14 +852,16 @@ class RNNGMMActorNetwork(RNNActorNetwork):
             # repeat the goal observation in time to match dimension with obs_dict
             mod = list(obs_dict.keys())[0]
             goal_dict = TensorUtils.unsqueeze_expand_at(goal_dict, size=obs_dict[mod].shape[1], dim=1)
-
-        outputs = RNN_MIMO_MLP.forward(
-            self, obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state)
+        if self.return_features:
+            outputs, self.enc_outputs = RNN_MIMO_MLP.forward(
+                self, obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state, return_features=self.return_features)
+        else:
+            outputs = RNN_MIMO_MLP.forward(
+                self, obs=obs_dict, goal=goal_dict, rnn_init_state=rnn_init_state, return_state=return_state, return_features=self.return_features)
         if return_state:
             outputs, state = outputs
         else:
             state = None
-        
         means = outputs["mean"]
         scales = outputs["scale"]
         logits = outputs["logits"]
