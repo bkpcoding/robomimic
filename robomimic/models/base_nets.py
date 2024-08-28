@@ -63,15 +63,24 @@ class Module(torch.nn.Module):
         """
         raise NotImplementedError
 
-
 class Sequential(torch.nn.Sequential, Module):
     """
     Compose multiple Modules together (defined above).
     """
-    def __init__(self, *args):
+    def __init__(self, *args, has_output_shape = True):
+        """
+        Args:
+            has_output_shape (bool, optional): indicates whether output_shape can be called on the Sequential module.
+                torch.nn modules do not have an output_shape, but Modules (defined above) do. Defaults to True.
+        """
         for arg in args:
-            assert isinstance(arg, Module)
+            if has_output_shape:
+                assert isinstance(arg, Module)
+            else:
+                assert isinstance(arg, nn.Module)
         torch.nn.Sequential.__init__(self, *args)
+        self.fixed = False
+        self.has_output_shape = has_output_shape
 
     def output_shape(self, input_shape=None):
         """
@@ -85,10 +94,22 @@ class Sequential(torch.nn.Sequential, Module):
         Returns:
             out_shape ([int]): list of integers corresponding to output shape
         """
+        if not self.has_output_shape:
+            raise NotImplementedError("Output shape is not defined for this module")
         out_shape = input_shape
         for module in self:
             out_shape = module.output_shape(out_shape)
         return out_shape
+
+    def freeze(self):
+        self.fixed = True
+
+    def train(self, mode):
+        if self.fixed:
+            super().train(False)
+        else:
+            super().train(mode)
+
 
 
 class Parameter(Module):
@@ -487,6 +508,71 @@ class ResNet18Conv(ConvBase):
                 Some modules may not need this argument, if their output does not depend 
                 on the size of the input, or if they assume fixed size input.
 
+        Returns:
+            out_shape ([int]): list of integers corresponding to output shape
+        """
+        assert(len(input_shape) == 3)
+        out_h = int(math.ceil(input_shape[1] / 32.))
+        out_w = int(math.ceil(input_shape[2] / 32.))
+        return [512, out_h, out_w]
+
+    def __repr__(self):
+        """Pretty print network."""
+        header = '{}'.format(str(self.__class__.__name__))
+        return header + '(input_channel={}, input_coord_conv={})'.format(self._input_channel, self._input_coord_conv)
+import torch
+import torch.nn as nn
+import torchvision.models as vision_models
+import math
+
+class ResNet50Conv(ConvBase):
+    """
+    A ResNet50 block that can be used to process input images,
+    with output channel dimension reduced to 512.
+    """
+    def __init__(
+        self,
+        input_channel=3,
+        pretrained=False,
+        input_coord_conv=False,
+    ):
+        """
+        Args:
+            input_channel (int): number of input channels for input images to the network.
+                If not equal to 3, modifies first conv layer in ResNet to handle the number
+                of input channels.
+            pretrained (bool): if True, load pretrained weights for all ResNet layers.
+            input_coord_conv (bool): if True, use a coordinate convolution for the first layer
+                (a convolution where input channels are modified to encode spatial pixel location)
+        """
+        super(ResNet50Conv, self).__init__()
+        net = vision_models.resnet50(pretrained=pretrained)
+        if input_coord_conv:
+            net.conv1 = CoordConv2d(input_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        elif input_channel != 3:
+            net.conv1 = nn.Conv2d(input_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+        # Cut the last fc layer
+        resnet_features = torch.nn.Sequential(*(list(net.children())[:-2]))
+        
+        # Add a 1x1 convolution to reduce channels from 2048 to 512
+        self.dimension_reduction = nn.Conv2d(2048, 512, kernel_size=1, stride=1, padding=0, bias=False)
+        
+        self.nets = nn.Sequential(
+            resnet_features,
+            self.dimension_reduction
+        )
+        
+        self._input_coord_conv = input_coord_conv
+        self._input_channel = input_channel
+
+    def output_shape(self, input_shape):
+        """
+        Function to compute output shape from inputs to this module. 
+        Args:
+            input_shape (iterable of int): shape of input. Does not include batch dimension.
+                Some modules may not need this argument, if their output does not depend 
+                on the size of the input, or if they assume fixed size input.
         Returns:
             out_shape ([int]): list of integers corresponding to output shape
         """

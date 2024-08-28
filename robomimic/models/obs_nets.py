@@ -22,7 +22,7 @@ from robomimic.utils.python_utils import extract_class_init_kwargs_from_dict
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
 from robomimic.models.base_nets import Module, Sequential, MLP, RNN_Base, ResNet18Conv, SpatialSoftmax, \
-    FeatureAggregator, VisualCore, Randomizer, R3MConv
+    FeatureAggregator, VisualCore, Randomizer, R3MConv, ResNet50Conv
 
 
 def obs_encoder_factory(
@@ -181,7 +181,7 @@ class ObservationEncoder(Module):
         # self.layers = ['0.nets.4.0.conv1']
         # self.layers = ['0.nets.1']
         # self.layers = ['0.nets.2.1.conv1']
-        self.layers = ['0.nets.4.1']
+        self.layers = []
 
     def make(self):
         """
@@ -267,7 +267,6 @@ class ObservationEncoder(Module):
             # flatten to [B, D]
             x = TensorUtils.flatten(x, begin_axis=1)
             feats.append(x)
-
         # concatenate all features together
         return torch.cat(feats, dim=-1)
 

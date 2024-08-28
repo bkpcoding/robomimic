@@ -151,10 +151,10 @@ def modify_config_for_default_image_exp(config, pretrained_backbone=False, resne
         config.observation.encoder.rgb.core_class = "VisualCore"
         config.observation.encoder.rgb.core_kwargs.feature_dimension = 64
         if resnet_50:
-            config.observation.encoder.rgb.core_kwargs.backbone_class = 'R3MConv'                         # R3M backbone for image observations (unused if no image observations)
-            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.r3m_model_class = 'resnet50'       # R3M model class (resnet18, resnet34, resnet50)
-            config.observation.encoder.rgb.core_kwargs.backbone_kwargs.freeze = True                      # whether to freeze network during training or allow finetuning
-            config.observation.encoder.rgb.core_kwargs.pool_class = None                                  # no pooling class for pretraining model
+            config.observation.encoder.rgb.core_kwargs.backbone_class = 'ResNet50Conv'                         # R3M backbone for image observations (unused if no image observations)
+            # config.observation.encoder.rgb.core_kwargs.backbone_kwargs.r3m_model_class = 'resnet50'       # R3M model class (resnet18, resnet34, resnet50)
+            # config.observation.encoder.rgb.core_kwargs.backbone_kwargs.freeze = True                      # whether to freeze network during training or allow finetuning
+            # config.observation.encoder.rgb.core_kwargs.pool_class = None                                  # no pooling class for pretraining model
         else:
             config.observation.encoder.rgb.core_kwargs.backbone_class = 'ResNet18Conv'                    # ResNet backbone for image observations (unused if no image observations)
         if pretrained_backbone == True:
